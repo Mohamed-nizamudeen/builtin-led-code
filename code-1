@@ -1,0 +1,82 @@
+#include <WiFi.h>
+#include <WebServer.h>
+
+// Replace with your WiFi name and password
+const char* ssid = "wifi-name";
+const char* password = "wifi-password";
+
+// ESP32 onboard LED pin
+const int ledPin = 2;
+
+String ledState = "off";
+
+WebServer server(80);
+
+void handleRoot() {
+  String html = "<!DOCTYPE html><html>";
+  html += "<head><meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<style>";
+  html += "body { font-family: Arial; text-align: center; margin-top: 50px; }";
+  html += "h1 { color: #222; }";
+  html += ".button { padding: 15px 40px; font-size: 25px; border: none; color: white; border-radius: 8px; cursor: pointer; }";
+  html += ".on { background-color: green; }";
+  html += ".off { background-color: red; }";
+  html += "</style></head>";
+
+  html += "<body>";
+  html += "<h1>ESP32 Inbuilt LED Control</h1>";
+  html += "<h2>LED State: " + ledState + "</h2>";
+
+  if (ledState == "off") {
+    html += "<a href='/led/on'><button class='button on'>Turn ON</button></a>";
+  } else {
+    html += "<a href='/led/off'><button class='button off'>Turn OFF</button></a>";
+  }
+
+  html += "</body></html>";
+
+  server.send(200, "text/html", html);
+}
+
+void handleLedOn() {
+  ledState = "on";
+  digitalWrite(ledPin, HIGH);
+  handleRoot();
+}
+
+void handleLedOff() {
+  ledState = "off";
+  digitalWrite(ledPin, LOW);
+  handleRoot();
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+
+  Serial.println("Connecting to WiFi...");
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println();
+  Serial.println("WiFi connected!");
+  Serial.print("ESP32 IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", handleRoot);
+  server.on("/led/on", handleLedOn);
+  server.on("/led/off", handleLedOff);
+
+  server.begin();
+  Serial.println("Web server started");
+}
+
+void loop() {
+  server.handleClient();
+}
