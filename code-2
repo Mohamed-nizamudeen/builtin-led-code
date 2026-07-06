@@ -1,0 +1,159 @@
+#include <WiFi.h>
+#include <WebServer.h>
+
+// Replace with your WiFi name and password
+const char* ssid = "YOUR_WIFI_NAME";
+const char* password = "YOUR_WIFI_PASSWORD";
+
+// ESP32 onboard LED pin
+const int ledPin = 2;
+
+// LED state variables
+String ledState = "off";
+bool isBlinking = false;
+
+// Blink timing
+int blinkDelay = 500;   // default delay in milliseconds
+unsigned long previousMillis = 0;
+bool ledBlinkState = LOW;
+
+// Create web server on port 80
+WebServer server(80);
+
+// Function to show webpage
+void handleRoot() {
+String html = "<!DOCTYPE html><html>";
+html += "<head><meta name='viewport' content='width=device-width, initial-scale=1'>";
+html += "<style>";
+html += "body { font-family: Arial; text-align: center; background: #f2f2f2; margin-top: 40px; }";
+html += ".card { background: white; padding: 25px; margin: auto; width: 90%; max-width: 420px; border-radius: 15px; box-shadow: 0 0 10px #ccc; }";
+html += "h1 { color: #222; }";
+html += "h2 { color: #444; }";
+html += ".button { padding: 14px 35px; font-size: 22px; border: none; color: white; border-radius: 8px; cursor: pointer; margin: 8px; }";
+html += ".on { background-color: green; }";
+html += ".off { background-color: red; }";
+html += ".blink { background-color: blue; }";
+html += "input { padding: 10px; font-size: 20px; width: 160px; text-align: center; margin: 10px; }";
+html += "</style></head>";
+
+html += "<body>";
+html += "<div class='card'>";
+html += "<h1>ESP32 Inbuilt LED Control</h1>";
+
+html += "<h2>LED State: " + ledState + "</h2>";
+html += "<h2>Blink Delay: " + String(blinkDelay) + " ms</h2>";
+
+html += "<a href='/led/on'><button class='button on'>LED ON</button></a>";
+html += "<a href='/led/off'><button class='button off'>LED OFF</button></a>";
+
+html += "<hr>";
+
+html += "<form action='/led/blink' method='GET'>";
+html += "<h2>Enter Blink Delay</h2>";
+html += "<input type='number' name='delay' value='" + String(blinkDelay) + "' min='50' max='10000'>";
+html += "<br>";
+html += "<button class='button blink' type='submit'>Start Blink</button>";
+html += "</form>";
+
+html += "<a href='/led/stopblink'><button class='button off'>Stop Blink</button></a>";
+
+html += "</div>";
+html += "</body></html>";
+
+server.send(200, "text/html", html);
+}
+
+// LED ON
+void handleLedOn() {
+isBlinking = false;
+ledState = "on";
+digitalWrite(ledPin, HIGH);
+handleRoot();
+}
+
+// LED OFF
+void handleLedOff() {
+isBlinking = false;
+ledState = "off";
+digitalWrite(ledPin, LOW);
+handleRoot();
+}
+
+// Start blinking
+void handleLedBlink() {
+if (server.hasArg("delay")) {
+blinkDelay = server.arg("delay").toInt();
+
+```
+// Safety limit
+if (blinkDelay < 50) {
+  blinkDelay = 50;
+}
+if (blinkDelay > 10000) {
+  blinkDelay = 10000;
+}
+```
+
+}
+
+isBlinking = true;
+ledState = "blinking";
+previousMillis = millis();
+
+handleRoot();
+}
+
+// Stop blinking
+void handleStopBlink() {
+isBlinking = false;
+ledState = "off";
+digitalWrite(ledPin, LOW);
+handleRoot();
+}
+
+void setup() {
+Serial.begin(115200);
+
+pinMode(ledPin, OUTPUT);
+digitalWrite(ledPin, LOW);
+
+Serial.print("Connecting to ");
+Serial.println(ssid);
+
+WiFi.begin(ssid, password);
+
+while (WiFi.status() != WL_CONNECTED) {
+delay(500);
+Serial.print(".");
+}
+
+Serial.println();
+Serial.println("WiFi connected!");
+Serial.print("ESP32 IP Address: ");
+Serial.println(WiFi.localIP());
+
+server.on("/", handleRoot);
+server.on("/led/on", handleLedOn);
+server.on("/led/off", handleLedOff);
+server.on("/led/blink", handleLedBlink);
+server.on("/led/stopblink", handleStopBlink);
+
+server.begin();
+Serial.println("HTTP server started");
+}
+
+void loop() {
+server.handleClient();
+
+// Non-blocking LED blink using millis()
+if (isBlinking) {
+unsigned long currentMillis = millis();
+if (currentMillis - previousMillis >= blinkDelay) {
+  previousMillis = currentMillis;
+
+  ledBlinkState = !ledBlinkState;
+  digitalWrite(ledPin, ledBlinkState);
+}
+
+}
+}
